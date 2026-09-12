@@ -30,6 +30,8 @@ internal static class SetupModeHost
     {
         var services = builder.Services;
 
+        // The correlation middleware is the only ServiceMantle capability activated in this phase.
+        services.AddSignaCoreServiceMantle();
         services.AddSingleton(bootstrap.Bootstrap.Database);
         services.AddSingleton(bootstrap.RuntimeState);
         services.AddSingleton(bootstrap.MasterKeyProvider);
@@ -88,7 +90,7 @@ internal static class SetupModeHost
 
     public static void ConfigurePipeline(WebApplication app, int httpPort)
     {
-        app.UseMiddleware<CorrelationIdMiddleware>();
+        app.UseServiceMantleCorrelationId();
         app.UseMiddleware<ExceptionHandlingMiddleware>();
         app.UseRateLimiter();
         app.UseMiddleware<SetupModeGateMiddleware>();

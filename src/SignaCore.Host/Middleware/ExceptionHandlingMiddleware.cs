@@ -47,7 +47,7 @@ public class ExceptionHandlingMiddleware
 
         // Do not expose raw exception messages to clients — they may contain
         // internal field names, database details, or stack-like information.
-        // The correlation is via server-side logs (see CorrelationIdMiddleware).
+        // The correlation is via server-side logs (see the ServiceMantle correlation middleware).
         var (status, title) = ex switch
         {
             ArgumentException => (StatusCodes.Status400BadRequest, "Bad Request"),

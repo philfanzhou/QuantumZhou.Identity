@@ -458,10 +458,11 @@ public class TokenControllerTests : IDisposable
     {
         var controller = CreateController(new[] { CreateFailingValidator("sms", "invalid code").Object });
 
-        // CorrelationIdMiddleware puts the id into HttpContext.Items at the very front of the
-        // pipeline; it is not on the request headers. The controller has to reuse it rather than
-        // call Guid.NewGuid() of its own.
-        controller.HttpContext.Items[CorrelationIdMiddleware.HttpContextItemsKey] = "corr-from-middleware";
+        // The correlation id is established by the real middleware at the very front of the
+        // pipeline, not by a second Guid.NewGuid() in the controller. It flows from the request
+        // header through the middleware's slot into the audit record.
+        controller.HttpContext.Request.Headers["x-correlation-id"] = "corr-from-middleware";
+        await CorrelationTestPipeline.EstablishAsync(controller.HttpContext);
 
         await controller.GetToken(new TokenRequest { GrantType = "sms" }, CancellationToken.None);
 

@@ -28,6 +28,8 @@ public class ProfileControllerTests
             httpContext.User = user;
         }
 
+        // Bind/Unbind read the correlation id; establish it with the real middleware as production does.
+        CorrelationTestPipeline.Establish(httpContext);
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         return controller;
     }

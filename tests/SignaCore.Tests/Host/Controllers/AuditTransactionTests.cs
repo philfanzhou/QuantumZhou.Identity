@@ -96,7 +96,7 @@ public sealed class AuditTransactionTests
         var app = CreateSmsApp();
         database.Context.AppRegistrations.Add(app);
         await database.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
-        var (controller, sender) = CreateSmsController(database.Context, app);
+        var (controller, sender) = await CreateSmsController(database.Context, app);
 
         var action = await controller.RequestSmsCode(
             new SmsCodeRequest { Phone = "13800138000" },
@@ -132,7 +132,7 @@ public sealed class AuditTransactionTests
         database.Context.AppRegistrations.Add(app);
         await database.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
         await FailLoginHistoryInsertAsync(database.Context);
-        var (controller, sender) = CreateSmsController(database.Context, app);
+        var (controller, sender) = await CreateSmsController(database.Context, app);
 
         var action = await controller.RequestSmsCode(
             new SmsCodeRequest { Phone = "13800138000" },
@@ -161,7 +161,7 @@ public sealed class AuditTransactionTests
         database.Context.AppRegistrations.Add(app);
         await database.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
-        var (controller, sender) = CreateSmsController(
+        var (controller, sender) = await CreateSmsController(
             database.Context,
             app,
             cancellation.Cancel);
@@ -1448,7 +1448,7 @@ public sealed class AuditTransactionTests
         return app;
     }
 
-    private static (SmsCodeController Controller, Mock<ISmsSender> Sender) CreateSmsController(
+    private static async Task<(SmsCodeController Controller, Mock<ISmsSender> Sender)> CreateSmsController(
         IdentityDbContext context,
         AppRegistrationEntity app,
         Action? onSend = null)
@@ -1488,7 +1488,9 @@ public sealed class AuditTransactionTests
         httpContext.Connection.RemoteIpAddress = IPAddress.Parse("192.0.2.10");
         httpContext.Request.Headers.UserAgent = "audit-test-agent";
         httpContext.Items[IdentityHeaders.ValidatedApp] = app;
-        httpContext.Items[CorrelationIdMiddleware.HttpContextItemsKey] = "correlation-148";
+        // The correlation id is established by the real middleware, not by writing its private slot.
+        httpContext.Request.Headers["x-correlation-id"] = "correlation-148";
+        await CorrelationTestPipeline.EstablishAsync(httpContext);
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         return (controller, sender);
     }
