@@ -506,9 +506,13 @@ jobs:
       - name: Database contract matrix
         run: |
           dotnet restore tests/SignaCore.IntegrationTests/SignaCore.IntegrationTests.csproj
+          # This job owns every test gated on RUN_SIGNACORE_DATABASE_CONTRACTS: a gated class the
+          # filter misses silently loses its PostgreSQL coverage to the local-only skip. Most gated
+          # classes match the DatabaseContractTests suffix; the adoption suite keeps its own name,
+          # so it is listed explicitly alongside the suffix clause.
           dotnet test tests/SignaCore.IntegrationTests/SignaCore.IntegrationTests.csproj \
             --configuration Release \
-            --filter 'FullyQualifiedName~DatabaseContractTests' \
+            --filter 'FullyQualifiedName~DatabaseContractTests|FullyQualifiedName~ServiceMantleInstallationAdoptionTests' \
             --report-xunit-trx \
             --report-xunit-trx-filename signacore-database-contracts.trx \
             --output Detailed \
