@@ -17,10 +17,58 @@ namespace SignaCore.Database.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("ServiceMantle.Persistence.EntityFrameworkCore.ServiceInstallationEntity", b =>
+                {
+                    b.Property<string>("ServiceId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("service_id");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at_utc");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("SetupCodeDigest")
+                        .HasMaxLength(74)
+                        .HasColumnType("character varying(74)")
+                        .HasColumnName("setup_code_digest");
+
+                    b.Property<DateTime?>("SetupCodeExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("setup_code_expires_at_utc");
+
+                    b.Property<int>("SetupCodeGeneration")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("setup_code_generation");
+
+                    b.Property<DateTime?>("SetupCodeIssuedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("setup_code_issued_at_utc");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("ServiceId");
+
+                    b.ToTable("service_installations", (string)null);
+                });
 
             modelBuilder.Entity("SignaCore.Database.Entity.AccountEntity", b =>
                 {

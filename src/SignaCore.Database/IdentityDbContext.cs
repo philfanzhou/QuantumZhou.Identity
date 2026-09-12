@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using ServiceMantle.Persistence.EntityFrameworkCore;
 using SignaCore.Database.Entity;
 
 namespace SignaCore.Database;
 
-public class IdentityDbContext : DbContext
+public class IdentityDbContext : DbContext, IServiceDbContext
 {
     private static readonly ValueConverter<DateTimeOffset, long> UnixMicrosecondsConverter = new(
         value => (value.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks) / 10,
@@ -34,6 +35,13 @@ public class IdentityDbContext : DbContext
     public DbSet<SystemSettingEntity> SystemSettings => Set<SystemSettingEntity>();
     public DbSet<InstallationStateEntity> InstallationStates => Set<InstallationStateEntity>();
     public DbSet<DataProtectionKeyEntity> DataProtectionKeys => Set<DataProtectionKeyEntity>();
+
+    // ServiceMantle shared installation state (service_installations). Added by issue #70 as a
+    // purely additive slice: SignaCore's own `installation_state` singleton stays the sole runtime
+    // authority for anonymous-setup protection, and nothing reads this table until the startup phase
+    // orchestration is wired in a later task. The consumer owns this mapping, its migrations, and
+    // every save/transaction boundary.
+    public DbSet<ServiceInstallationEntity> ServiceInstallations => Set<ServiceInstallationEntity>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -409,6 +417,13 @@ public class IdentityDbContext : DbContext
             ConfigureInstant(entity.Property(e => e.CompletedAt).HasColumnName("completed_at"));
             entity.Property(e => e.ConfigurationVersion).HasColumnName("configuration_version");
         });
+
+        // ServiceMantle shared installation mapping (service_installations). Applied last so it never
+        // interferes with the SignaCore-owned configuration above. ServiceInstallationEntity uses
+        // DateTime, so its *_at_utc columns keep the library's provider-default storage rather than
+        // the SignaCore DateTimeOffset/Unix-microseconds convention; this is intentional and isolated
+        // to the service_installations table.
+        modelBuilder.AddServiceMantleInstallation();
     }
 
     private void ConfigureInstant(PropertyBuilder property)
