@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - .NET SDK 10
-- Node.js 20.19+ or 22.12+ and npm
+- Node.js 22.12+, 24+, or 26+ and npm
 - PostgreSQL for the default profile; SQLite may be selected instead
 - Docker for image and smoke-test verification
 
