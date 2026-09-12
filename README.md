@@ -31,7 +31,7 @@ SignaCore is a .NET 10 identity and authentication service. It centralizes accou
 
 ## Build and test
 
-Requirements: .NET SDK 10, Node.js 20.19+ or 22.12+ with npm for the admin UI, and Docker for the container smoke test.
+Requirements: .NET SDK 10, Node.js 22.12+, 24+, or 26+ with npm for the admin UI, and Docker for the container smoke test.
 
 ```bash
 dotnet restore SignaCore.slnx
