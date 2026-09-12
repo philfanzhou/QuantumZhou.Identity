@@ -2,6 +2,26 @@
 
 `ExceptionHandlingMiddleware` is the final boundary for unhandled request exceptions. Controllers should return expected validation and authorization failures explicitly; unexpected failures are logged with the correlation identifier and converted to a stable JSON error response.
 
+## Request correlation
+
+The shared ServiceMantle correlation middleware (`UseServiceMantleCorrelationId`, registered first in every host pipeline — Bootstrap Configuration Mode, Setup Mode, and the normal host) owns the whole correlation contract:
+
+- A request header `x-correlation-id` is reused verbatim only when it carries exactly one value
+  matching `[A-Za-z0-9][A-Za-z0-9._-]{0,63}` (at most 64 characters). Missing, empty, blank,
+  overlong, malformed, comma-joined, and repeated headers are discarded as a whole — the value is
+  never trimmed, truncated, or partially selected — and a fresh 32-character lowercase hex id is
+  generated instead. The rejected raw value appears in none of the outputs.
+- The resolved id is published once to the request slot, the response header (written when the
+  response starts), and the request logging scope; `HttpContextExtensions.GetCorrelationId()`
+  reads only the slot. It throws a fixed `InvalidOperationException` when the middleware has not
+  run, so there is no raw-header fallback and no second id generation. Audit rows therefore always
+  match the response header and the logs.
+- The middleware logs nothing itself and never swallows downstream exceptions or cancellation;
+  `ExceptionHandlingMiddleware` remains the single logging boundary for unhandled failures. A
+  correlation id is a log-correlation value only — not authenticated, not unique, and never an
+  authorization or audit subject identity. The raw caller header stays on the request object; do
+  not bypass the accessor and treat it as trusted.
+
 ## Rules
 
 - Do not return stack traces, connection strings, credentials, tokens, OTPs, or private key material.
@@ -13,7 +33,8 @@
   an audit persistence failure fails that commit and rolls back its business changes. Do not swallow
   the failure to report business success; see [current audit commit evidence](#current-audit-commit-evidence).
 
-Sensitive request headers are redacted by middleware. Tests cover correlation propagation, exception mapping, and header redaction.
+Sensitive request headers are redacted by middleware. Tests cover correlation propagation (see
+[request correlation](#request-correlation)), exception mapping, and header redaction.
 
 ## Current audit commit evidence
 

@@ -34,16 +34,19 @@ public static class HttpContextExtensions
         context.Request.Headers.UserAgent.ToString();
 
     /// <summary>
-    /// The correlation id of this request. It has to reuse the one
-    /// <see cref="CorrelationIdMiddleware"/> already generated and wrote into the response headers
-    /// and the logging scope, never generate another — otherwise, when a caller sends no
-    /// x-correlation-id, the id recorded in the audit table would not match the one in the logs and
-    /// the response headers, and the two could not be stitched together afterwards.
+    /// The correlation id of this request. It reuses the single value the ServiceMantle correlation
+    /// middleware already resolved and published to the response header and the logging scope —
+    /// never re-reads the raw request header and never generates another id, so the value recorded
+    /// in the audit table always matches the one in the logs and the response headers.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The correlation middleware has not run for this request. Every production pipeline registers
+    /// it first; reaching this branch means a caller bypassed the composed host.
+    /// </exception>
     public static string GetCorrelationId(this HttpContext context) =>
-        context.Items[CorrelationIdMiddleware.HttpContextItemsKey] as string
-        ?? context.Request.Headers[CorrelationIdMiddleware.CorrelationIdHeader].FirstOrDefault()
-        ?? Guid.NewGuid().ToString("N");
+        context.GetServiceMantleCorrelationId()
+        ?? throw new InvalidOperationException(
+            "The correlation id is unavailable because the ServiceMantle correlation middleware has not run for this request.");
 
     public static string? GetAppId(this HttpContext context) =>
         context.Items[IdentityHeaders.AppId] as string

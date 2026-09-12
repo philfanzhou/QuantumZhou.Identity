@@ -193,6 +193,9 @@ if (bootstrapResult.Phase != InstallationPhase.Completed)
 // ---- Consul Service Discovery (optional) ----
 builder.Services.AddConsulDiscoveryIfEnabled(builder.Configuration);
 
+// ---- ServiceMantle host identity (Correlation ID middleware) ----
+builder.Services.AddSignaCoreServiceMantle();
+
 // ---- Infrastructure (DI, Auth, CORS, Rate Limiting, OpenTelemetry) ----
 var (jwtOptions, dbProvider) = builder.Services.AddIdentityInfrastructure(
     builder.Configuration,
@@ -298,7 +301,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Identity Service API v1"));
 }
 app.UseForwardedHeaders();
-app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseServiceMantleCorrelationId();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseCors("AdminWeb");
 // Rate limiting must run before authentication/authorization. Both gateway schemes perform a

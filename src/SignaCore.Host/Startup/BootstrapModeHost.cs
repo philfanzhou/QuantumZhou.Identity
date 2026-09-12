@@ -21,6 +21,9 @@ internal static class BootstrapModeHost
     {
         var services = builder.Services;
 
+        // The correlation middleware is the only ServiceMantle capability activated in this phase;
+        // its lazily registered Bootstrap store is never resolved by this host.
+        services.AddSignaCoreServiceMantle();
         services.AddSingleton(codeAuthority);
         services.AddSingleton<BootstrapConfigurationService>();
 
@@ -56,7 +59,7 @@ internal static class BootstrapModeHost
 
     public static void ConfigurePipeline(WebApplication app, int httpPort)
     {
-        app.UseMiddleware<CorrelationIdMiddleware>();
+        app.UseServiceMantleCorrelationId();
         app.UseMiddleware<ExceptionHandlingMiddleware>();
         app.UseRateLimiter();
         app.UseMiddleware<BootstrapModeGateMiddleware>();

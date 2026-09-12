@@ -101,11 +101,17 @@ internal static class AuthTestDoubles
     public static AdminIdentityOptions AdminIdentity(string username = "admin") =>
         new() { Username = username };
 
-    /// <summary>Gives the controller an HttpContext with a fixed remote IP.</summary>
-    public static T WithHttpContext<T>(this T controller) where T : ControllerBase
+    /// <summary>
+    /// Gives the controller an HttpContext with a fixed remote IP and a correlation slot established
+    /// by the real ServiceMantle correlation middleware — the same way every production pipeline
+    /// does. Controllers that call <see cref="HttpContextExtensions.GetCorrelationId"/> rely on it.
+    /// </summary>
+    public static T WithHttpContext<T>(this T controller, string? correlationId = null)
+        where T : ControllerBase
     {
         var httpContext = new DefaultHttpContext();
         httpContext.Connection.RemoteIpAddress = IPAddress.Parse("127.0.0.1");
+        CorrelationTestPipeline.Establish(httpContext, correlationId);
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         return controller;
     }

@@ -17,27 +17,28 @@ using Xunit;
 namespace SignaCore.Tests.Host.Controllers;
 
 /// <summary>
-/// Log-shape contract of <c>GET /oauth2/authorize</c>. The endpoint is unauthenticated and the
-/// correlation id it logs is a request header that <see cref="CorrelationIdMiddleware"/> passes
-/// through verbatim whenever the caller supplies one, so it is fully attacker controlled.
+/// Log-shape contract of <c>GET /oauth2/authorize</c>. The endpoint is unauthenticated, so the
+/// correlation id it logs is attacker controlled at the source. The ServiceMantle correlation
+/// middleware only accepts a single header value matching the fixed correlation shape; a value
+/// with line endings is discarded whole and replaced by a generated id, so the forged content
+/// cannot reach the log at all. The controller still encodes line endings as defense in depth.
 /// </summary>
 public class OAuthAuthorizationControllerTests
 {
-    private const string CorrelationIdHeader = CorrelationIdMiddleware.CorrelationIdHeader;
+    private const string CorrelationIdHeader = "x-correlation-id";
 
     /// <summary>
-    /// A correlation id carrying line endings must not be able to add physical lines to the
-    /// application log, which is how a forged entry would be smuggled in. The value keeps its own
-    /// data; only its line endings are encoded, exactly as everywhere else this header is logged.
+    /// A correlation id carrying line endings can no longer pass the middleware's acceptance rule,
+    /// so the log line carries the generated replacement; the forged entry must not appear.
     /// </summary>
     [Theory]
     [InlineData("abc\nWARN Forged log line")]
     [InlineData("abc\r\nWARN Forged log line")]
     [InlineData("abc\rWARN Forged log line")]
-    public async Task LocalRejection_KeepsAnInjectedCorrelationIdOnOnePhysicalLogLine(string correlationId)
+    public async Task LocalRejection_RejectsAnInjectedCorrelationIdEntirely(string correlationId)
     {
         var logger = new TestLogger<OAuthAuthorizationController>();
-        var controller = CreateController(
+        var controller = await CreateController(
             new OidcAuthorizationValidationResult.LocalRejection(
                 OidcAuthorizationLocalReasons.ClientUnknown),
             logger,
@@ -54,14 +55,18 @@ public class OAuthAuthorizationControllerTests
         Assert.DoesNotContain('\n', entry);
         Assert.DoesNotContain('\r', entry);
         Assert.Contains(OidcAuthorizationLocalReasons.ClientUnknown, entry, StringComparison.Ordinal);
-        Assert.Contains("abc\\nWARN Forged log line", entry, StringComparison.Ordinal);
+        // The injected value is discarded whole: neither its text nor a line-ending-encoded copy
+        // survives into the logged correlation id.
+        Assert.DoesNotContain("Forged log line", entry, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc\\r", entry, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc\\n", entry, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task LocalRejection_LogsAnOrdinaryCorrelationIdUnchanged()
     {
         var logger = new TestLogger<OAuthAuthorizationController>();
-        var controller = CreateController(
+        var controller = await CreateController(
             new OidcAuthorizationValidationResult.LocalRejection(
                 OidcAuthorizationLocalReasons.RedirectUriUnmatched),
             logger,
@@ -92,8 +97,7 @@ public class OAuthAuthorizationControllerTests
             unitOfWork.Object,
             AuthTestDoubles.AuthMetrics(),
             new JwtOptions { Issuer = "https://issuer.example" },
-            NullLogger<OAuthAuthorizationController>.Instance).WithHttpContext();
-        controller.HttpContext.Items[CorrelationIdMiddleware.HttpContextItemsKey] = "correlation-148";
+            NullLogger<OAuthAuthorizationController>.Instance).WithHttpContext("correlation-148");
 
         var result = await controller.Authorize(TestContext.Current.CancellationToken);
 
@@ -170,7 +174,7 @@ public class OAuthAuthorizationControllerTests
             "client-1", applicationId, "https://client.example/callback", "invalid_request",
             "The request is invalid.", null);
 
-    private static OAuthAuthorizationController CreateController(
+    private static async Task<OAuthAuthorizationController> CreateController(
         OidcAuthorizationValidationResult result,
         ILogger<OAuthAuthorizationController> logger,
         string correlationId)
@@ -192,6 +196,10 @@ public class OAuthAuthorizationControllerTests
 
         var httpContext = new DefaultHttpContext();
         httpContext.Request.Headers[CorrelationIdHeader] = correlationId;
+        // The correlation slot is established by the real middleware, so the controller's accessor
+        // observes exactly what production would: an accepted value verbatim, or the generated
+        // replacement for a rejected one.
+        await CorrelationTestPipeline.EstablishAsync(httpContext);
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         return controller;
     }

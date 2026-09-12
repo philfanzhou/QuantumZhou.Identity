@@ -5,6 +5,8 @@
       <Exclude>
         <ModulePath>.*Tests\.dll$</ModulePath>
         <ModulePath>.*Database\.Migrations\..*\.dll$</ModulePath>
+        <!-- Third-party hosting foundation restored as a pinned NuGet package, not SignaCore code. -->
+        <ModulePath>.*ServiceMantle(\.AspNetCore)?\.dll$</ModulePath>
       </Exclude>
     </ModulePaths>
     <Sources>

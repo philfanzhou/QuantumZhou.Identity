@@ -50,28 +50,28 @@ public class HttpContextExtensionsTests
     }
 
     [Fact]
-    public void GetCorrelationId_PrefersValueProducedByMiddleware()
+    public async Task GetCorrelationId_ReturnsTheValueTheMiddlewareEstablished()
     {
         var context = new DefaultHttpContext();
-        context.Items[CorrelationIdMiddleware.HttpContextItemsKey] = "from-middleware";
-        context.Request.Headers[CorrelationIdMiddleware.CorrelationIdHeader] = "from-caller";
+        await CorrelationTestPipeline.EstablishAsync(context, "from-middleware");
+        context.Request.Headers["x-correlation-id"] = "from-caller";
 
+        // Only the middleware's slot is read; the raw header never wins even after the fact.
         Assert.Equal("from-middleware", context.GetCorrelationId());
     }
 
     [Fact]
-    public void GetCorrelationId_WithoutMiddlewareValue_FallsBackToRequestHeader()
+    public void GetCorrelationId_WithoutMiddleware_ThrowsAndNeverTrustsTheHeader()
     {
         var context = new DefaultHttpContext();
-        context.Request.Headers[CorrelationIdMiddleware.CorrelationIdHeader] = "from-caller";
+        context.Request.Headers["x-correlation-id"] = "from-caller";
 
-        Assert.Equal("from-caller", context.GetCorrelationId());
-    }
+        var thrown = Assert.Throws<InvalidOperationException>(() => context.GetCorrelationId());
 
-    [Fact]
-    public void GetCorrelationId_WithNothingSet_GeneratesNonEmptyValue()
-    {
-        Assert.False(string.IsNullOrWhiteSpace(new DefaultHttpContext().GetCorrelationId()));
+        // A fixed, input-free message: neither the raw header value nor a fresh id is produced.
+        Assert.Equal(
+            "The correlation id is unavailable because the ServiceMantle correlation middleware has not run for this request.",
+            thrown.Message);
     }
 
     [Fact]
